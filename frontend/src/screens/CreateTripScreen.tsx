@@ -77,8 +77,8 @@ export const CreateTripScreen: React.FC = () => {
       cover_image_url: coverImageUrl.trim() || undefined,
       starting_location: startingLocation.trim(),
       ending_location: endingLocation.trim(),
-      start_date: startDate || null,
-      end_date: endDate || null,
+      start_date: startDate || undefined,
+      end_date: endDate || undefined,
       category,
       visibility,
     };
