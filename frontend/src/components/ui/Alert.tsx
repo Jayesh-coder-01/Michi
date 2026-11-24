@@ -2,17 +2,22 @@ import React from 'react';
 
 export interface AlertProps {
   type?: 'error' | 'success' | 'info' | 'warning';
+  variant?: 'error' | 'success' | 'info' | 'warning';
   title?: string;
   message: string;
   className?: string;
+  onClose?: () => void;
 }
 
 export const Alert: React.FC<AlertProps> = ({
-  type = 'info',
+  type,
+  variant,
   title,
   message,
   className = '',
+  onClose,
 }) => {
+  const alertType = variant || type || 'info';
   const styles = {
     error: {
       bg: 'bg-light-error/10 dark:bg-dark-error/15',
@@ -38,7 +43,7 @@ export const Alert: React.FC<AlertProps> = ({
       text: 'text-[#005575] dark:text-sky-blue',
       icon: 'info',
     },
-  }[type];
+  }[alertType];
 
   return (
     <div
@@ -52,6 +57,16 @@ export const Alert: React.FC<AlertProps> = ({
         {title && <h4 className="font-semibold text-sm mb-0.5">{title}</h4>}
         <p>{message}</p>
       </div>
+      {onClose && (
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close alert"
+          className="text-current opacity-70 hover:opacity-100 transition-opacity"
+        >
+          <span className="material-symbols-outlined text-base">close</span>
+        </button>
+      )}
     </div>
   );
 };
