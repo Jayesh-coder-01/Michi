@@ -44,8 +44,8 @@ export const MyProfileScreen: React.FC = () => {
     }
   }, [activeTab, fetchMyTrips]);
 
-  const handleCreateTrip = async (data: TripCreateInput) => {
-    await api.trips.create(data);
+  const handleCreateTrip = async (data: TripCreateInput | TripUpdateInput) => {
+    await api.trips.create(data as TripCreateInput);
     await fetchMyTrips();
   };
 

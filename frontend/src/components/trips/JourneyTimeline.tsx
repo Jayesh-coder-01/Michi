@@ -6,6 +6,8 @@ interface JourneyTimelineProps {
   startingLocation: string;
   endingLocation: string;
   stops: TripStop[];
+  startDate?: string | null;
+  endDate?: string | null;
   isOwner?: boolean;
   isEditable?: boolean;
   onAddStop?: () => void;
@@ -20,6 +22,8 @@ export const JourneyTimeline: React.FC<JourneyTimelineProps> = ({
   startingLocation,
   endingLocation,
   stops,
+  startDate,
+  endDate,
   isOwner = false,
   isEditable,
   onAddStop,

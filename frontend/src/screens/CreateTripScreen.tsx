@@ -232,7 +232,7 @@ export const CreateTripScreen: React.FC = () => {
                 onChange={(e) => setCategory(e.target.value as TripCategory)}
                 className="w-full rounded-DEFAULT border border-light-outline-variant dark:border-dark-outline-variant bg-light-surface dark:bg-dark-surface text-light-on-surface dark:text-dark-on-surface px-3.5 py-2.5 font-body text-body-md focus:outline-none focus:ring-2 focus:ring-forest-green"
               >
-                {TRIP_CATEGORIES.map((cat) => (
+                {TRIP_CATEGORIES.map((cat: string) => (
                   <option key={cat} value={cat}>
                     {cat}
                   </option>
