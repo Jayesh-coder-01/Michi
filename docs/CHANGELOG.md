@@ -7,6 +7,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [1.3.0] - 2026-11-24
+
+### Completed — Phase 3: Trip Management & Stop Engine (Backend & Frontend UI Implementation)
+- **Backend Functionality & Lifecycle State Machine**:
+  - Implemented `public.trips` and `public.trip_stops` relational schema with check constraints, foreign-key cascades, and Row-Level Security (RLS) policies.
+  - Enforced strict lifecycle state machine with dedicated endpoints (`POST /publish`, `/archive`, `/restore`, `/unpublish`). Stripped `status` from `TripUpdate` / `PATCH` to prevent unauthorized lifecycle bypass.
+  - Implemented atomic sequential stop reordering with pessimistic parent trip locking (`SELECT ... FOR UPDATE`).
+  - Implemented mandatory publishing checklist validation (title min 3 chars, category, origin, destination, valid date sequence; supports point-to-point 0-stop journeys).
+  - Passing 97 backend automated test cases (`test_trips.py`, `test_trip_stops.py`, `test_trips_crud_and_lifecycle.py`, `test_trip_stops_and_reorder.py`, `test_migration_sql.py`, `test_profiles.py`, `test_rls_verification.py`, `test_supabase_jwt.py`).
+- **Frontend UI Implementation**:
+  - **My Trips Dashboard (`MyTripsScreen.tsx`)**: Displays user's journeys with filter tabs (All, Published, Drafts, Archived), search filtering, empty state with "Create Your First Trip" CTA, loading & error states.
+  - **Create Trip (`CreateTripScreen.tsx`)**: Form wizard capturing title, description, cover image presets, start/end locations, dates, 10 PRD categories, and Privacy by default. Actions for "Save as Draft", "Continue to Stops", and "Publish Now".
+  - **Trip Details (`TripDetailsScreen.tsx`)**: Flagship view rendering hero banner, route overview, owner chip, status & visibility badges, full `JourneyTimeline`, owner management toolbar, and graceful 403 Forbidden handling.
+  - **Trip Editor (`TripEditorScreen.tsx`)**: Comprehensive hub separating Trip Fundamentals (`PATCH`), Stop Management & Atomic Reordering (`PUT /reorder`), and Dedicated Lifecycle State Machine (`/publish`, `/archive`, `/restore`, `/unpublish`, `DELETE`).
+  - **Journey Timeline (`JourneyTimeline.tsx`)**: Vertical timeline visualizer distinguishing Departure Point $\rightarrow$ Intermediate Stops $\rightarrow$ Final Destination, with drag-and-drop and Move Up / Move Down buttons.
+  - **Waypoint Editor (`StopModal.tsx`)**: Dialog for adding and editing stops with coordinate boundary validation (-90..90, -180..180) and date validation.
+  - **Publishing Confirmation (`PublishModal.tsx`)**: Pre-publish checklist validator and visibility selector (Public vs Private).
+  - **Access Denied Screen (`AccessDeniedScreen.tsx`)**: Dedicated 403 Forbidden screen informing visitors when accessing a private trip.
+  - **Danger Confirmation Dialog (`ConfirmModal.tsx`)**: Reusable danger dialog for irreversible deletions.
+- **Frontend Verification & Production Build**:
+  - Passing 19 Vitest unit & component test cases across `trips.test.tsx` and `auth.test.tsx`.
+  - Production build successfully transformed 114 modules with zero TypeScript or Vite errors.
+
+---
+
 ## [1.1.4] - 2026-11-24
 
 ### Security — Phase 2 Final RLS Security Corrections & Integration Harness

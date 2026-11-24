@@ -8,7 +8,7 @@ import { EditProfileModal } from './EditProfileModal';
 import { TripCard } from '../components/trips/TripCard';
 import { TripEditorModal } from '../components/trips/TripEditorModal';
 import { api } from '../services/api';
-import { TripListItem, TripCreateInput } from '../types/trip';
+import { TripListItem, TripCreateInput, TripUpdateInput } from '../types/trip';
 
 export const MyProfileScreen: React.FC = () => {
   const { profile, user, logout, refreshProfile } = useAuth();

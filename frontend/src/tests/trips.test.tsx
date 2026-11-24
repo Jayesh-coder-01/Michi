@@ -9,6 +9,11 @@ import { TripCard } from '../components/trips/TripCard';
 import { JourneyTimeline } from '../components/trips/JourneyTimeline';
 import { StopModal } from '../components/trips/StopModal';
 import { TripEditorModal } from '../components/trips/TripEditorModal';
+import { MyTripsScreen } from '../screens/MyTripsScreen';
+import { CreateTripScreen } from '../screens/CreateTripScreen';
+import { TripEditorScreen } from '../screens/TripEditorScreen';
+import { AccessDeniedScreen } from '../screens/AccessDeniedScreen';
+import { api } from '../services/api';
 import { Trip, TripStop } from '../types/trip';
 
 const mockTrip: Trip = {
@@ -248,5 +253,70 @@ describe('Trip Management Frontend Components & Design System Suite', () => {
     fireEvent.click(screen.getByRole('button', { name: /create draft/i }));
     expect(screen.getByText(/end date cannot be earlier than start date/i)).toBeInTheDocument();
     expect(handleSubmit).not.toHaveBeenCalled();
+  });
+
+  it('renders MyTripsScreen with header, tabs, and empty state', async () => {
+    vi.spyOn(api.trips, 'getMyTrips').mockResolvedValue({
+      items: [],
+      total: 0,
+      page: 1,
+      page_size: 20,
+      has_more: false,
+    });
+
+    render(
+      <ThemeProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <MyTripsScreen />
+          </BrowserRouter>
+        </AuthProvider>
+      </ThemeProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /my journeys & itineraries/i })).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('button', { name: /all routes/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /published/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /drafts/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /create your first trip/i })).toBeInTheDocument();
+  });
+
+  it('renders CreateTripScreen with privacy defaulting to private', () => {
+    render(
+      <ThemeProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <CreateTripScreen />
+          </BrowserRouter>
+        </AuthProvider>
+      </ThemeProvider>
+    );
+
+    expect(screen.getByRole('heading', { name: /create a new trip/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/trip title/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/starting location/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/ending location/i)).toBeInTheDocument();
+    expect(screen.getByText(/private journey/i)).toBeInTheDocument();
+    expect(screen.getByText('Default')).toBeInTheDocument();
+  });
+
+  it('renders AccessDeniedScreen with 403 status explanation', () => {
+    render(
+      <ThemeProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <AccessDeniedScreen />
+          </BrowserRouter>
+        </AuthProvider>
+      </ThemeProvider>
+    );
+
+    expect(screen.getByRole('heading', { name: /this journey is private/i })).toBeInTheDocument();
+    expect(screen.getByText(/403 · private route/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /return home/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /go to my trips/i })).toBeInTheDocument();
   });
 });

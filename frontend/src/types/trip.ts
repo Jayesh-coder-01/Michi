@@ -26,19 +26,6 @@ export const TRIP_CATEGORIES: TripCategory[] = [
   'Other',
 ];
 
-export const TRIP_CATEGORIES: TripCategory[] = [
-  'Solo travel',
-  'Road trip',
-  'Backpacking',
-  'Family trip',
-  'Adventure',
-  'Trekking',
-  'Cultural exploration',
-  'Beach vacation',
-  'International travel',
-  'Other',
-];
-
 export interface TripOwnerSnippet {
   id: string;
   username: string;
