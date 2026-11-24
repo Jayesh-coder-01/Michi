@@ -11,6 +11,7 @@ export interface ConfirmModalProps {
   confirmText?: string;
   cancelText?: string;
   variant?: 'danger' | 'warning' | 'primary';
+  isDangerous?: boolean;
   isLoading?: boolean;
 }
 
@@ -22,9 +23,11 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   message,
   confirmText = 'Confirm',
   cancelText = 'Cancel',
-  variant = 'danger',
+  variant,
+  isDangerous,
   isLoading = false,
 }) => {
+  const effectiveVariant = isDangerous ? 'danger' : (variant || 'danger');
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} maxWidth="sm">
       <div className="p-6 flex flex-col gap-4">
@@ -37,11 +40,11 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             {cancelText}
           </Button>
           <Button
-            variant={variant === 'danger' ? 'adventure' : 'primary'}
+            variant={effectiveVariant === 'danger' ? 'adventure' : 'primary'}
             size="md"
             onClick={onConfirm}
             isLoading={isLoading}
-            className={variant === 'danger' ? 'bg-light-error hover:bg-red-700 text-white' : ''}
+            className={effectiveVariant === 'danger' ? 'bg-light-error hover:bg-red-700 text-white' : ''}
           >
             {confirmText}
           </Button>
