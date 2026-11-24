@@ -8,7 +8,8 @@ import { TripStop, TripStopCreateInput, TripStopUpdateInput } from '../../types/
 interface StopModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: TripStopCreateInput | TripStopUpdateInput) => Promise<void>;
+  onSubmit?: (data: TripStopCreateInput | TripStopUpdateInput) => Promise<void>;
+  onSave?: (data: TripStopCreateInput | TripStopUpdateInput) => Promise<void>;
   initialStop?: TripStop | null;
   tripStartDate?: string | null;
   tripEndDate?: string | null;
@@ -18,10 +19,12 @@ export const StopModal: React.FC<StopModalProps> = ({
   isOpen,
   onClose,
   onSubmit,
+  onSave,
   initialStop = null,
   tripStartDate,
   tripEndDate,
 }) => {
+  const saveHandler = onSave || onSubmit;
   const isEditing = Boolean(initialStop);
 
   const [stopName, setStopName] = useState('');
@@ -105,7 +108,7 @@ export const StopModal: React.FC<StopModalProps> = ({
         activities: activities.trim() || undefined,
         notes: notes.trim() || undefined,
       };
-      await onSubmit(payload);
+      if (saveHandler) await saveHandler(payload);
       onClose();
     } catch (err: any) {
       setError(err.message || 'Failed to save stop.');
