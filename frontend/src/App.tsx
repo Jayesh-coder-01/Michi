@@ -18,7 +18,6 @@ import { CreateTripScreen } from './screens/CreateTripScreen';
 import { TripEditorScreen } from './screens/TripEditorScreen';
 import { AccessDeniedScreen } from './screens/AccessDeniedScreen';
 import { NotFoundScreen } from './screens/NotFoundScreen';
-import { ChatbotWidget } from './components/common/ChatbotWidget';
 
 export const App: React.FC = () => {
   return (
@@ -75,7 +74,6 @@ export const App: React.FC = () => {
             <Route path="/404" element={<NotFoundScreen />} />
             <Route path="*" element={<NotFoundScreen />} />
           </Routes>
-          <ChatbotWidget />
         </BrowserRouter>
       </AuthProvider>
     </ThemeProvider>
