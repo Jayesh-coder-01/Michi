@@ -12,6 +12,31 @@ export interface AuthUser {
   is_verified?: boolean;
 }
 
+const DEV_USERS = {
+  user1: {
+    token:
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDEiLCJlbWFpbCI6ImtlbmppQG1pY2hpLnRyYXZlbCIsImF1ZCI6ImF1dGhlbnRpY2F0ZWQiLCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImlzcyI6Imh0dHBzOi8vaXliZnJ3dHJtbm9qZmtvdXVnZWsuc3VwYWJhc2UuY28vYXV0aC92MSIsImV4cCI6MTc5NTYwMTIxNiwiaWF0IjoxNzk1NTk3NjE2LCJhcHBfbWV0YWRhdGEiOnsicHJvdmlkZXIiOiJlbWFpbCIsInByb3ZpZGVycyI6WyJlbWFpbCJdfSwidXNlcl9tZXRhZGF0YSI6eyJ1c2VybmFtZSI6ImtlbmppX3RyYXZlbHMiLCJkaXNwbGF5X25hbWUiOiJLZW5qaV90cmF2ZWxzIn19.kDf8AWeCi852qvXOz7mGNwMEegdBCDIJAHPiLhUMw90',
+    user: {
+      id: '00000000-0000-0000-0000-000000000001',
+      email: 'kenji@michi.travel',
+      username: 'kenji_travels',
+      display_name: 'Kenji Sato',
+      is_verified: true,
+    },
+  },
+  user2: {
+    token:
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDIiLCJlbWFpbCI6Im1heWFAbWljaGkudHJhdmVsIiwiYXVkIjoiYXV0aGVudGljYXRlZCIsInJvbGUiOiJhdXRoZW50aWNhdGVkIiwiaXNzIjoiaHR0cHM6Ly9peWJmcnd0cm1ub2pma291dWdlay5zdXBhYmFzZS5jby9hdXRoL3YxIiwiZXhwIjoxNzk1NjAxMjE2LCJpYXQiOjE3OTU1OTc2MTYsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7InVzZXJuYW1lIjoibWF5YV93YW5kZXJlciIsImRpc3BsYXlfbmFtZSI6Ik1heWFfd2FuZGVyZXIifX0.ZAibRlD_amjuFKYuF96B_MWLFj59qPy0qS3_1HumhwI',
+    user: {
+      id: '00000000-0000-0000-0000-000000000002',
+      email: 'maya@michi.travel',
+      username: 'maya_wanderer',
+      display_name: 'Maya Lin',
+      is_verified: true,
+    },
+  },
+};
+
 interface AuthContextType {
   user: AuthUser | null;
   profile: Profile | null;
@@ -19,6 +44,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (credentials: { email: string; password: string }) => Promise<void>;
+  loginAsDevUser: (target: 'user1' | 'user2') => Promise<void>;
   register: (data: { email: string; password: string; display_name: string; username: string }) => Promise<void>;
   logout: () => Promise<void>;
   loginWithGoogle: () => Promise<void>;
@@ -92,20 +118,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    // 1. Initial session load from Supabase Auth
+    // 1. Initial session load from Supabase Auth or Local Storage fallback
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         syncSession(session.user, session.access_token);
       } else {
+        const storedToken = localStorage.getItem('michi_access_token');
+        const storedUser = localStorage.getItem('michi_user');
+        if (storedToken && storedUser) {
+          try {
+            const parsedUser = JSON.parse(storedUser);
+            setUser(parsedUser);
+            setToken(storedToken);
+            api.profiles
+              .getMyProfile()
+              .then((p) => {
+                setProfile(p);
+                setIsLoading(false);
+              })
+              .catch(() => {
+                setIsLoading(false);
+              });
+            return;
+          } catch {
+            // invalid json in storage
+          }
+        }
         setIsLoading(false);
       }
     });
 
     // 2. Real-time auth state listener (handles login, logout, token refresh, OAuth redirects)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session) {
         await syncSession(session.user, session.access_token);
-      } else {
+      } else if (event === 'SIGNED_OUT') {
         await syncSession(null, null);
       }
     });
@@ -115,8 +164,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
+  const loginAsDevUser = async (target: 'user1' | 'user2') => {
+    setIsLoading(true);
+    const selected = DEV_USERS[target];
+    setUser(selected.user);
+    setToken(selected.token);
+    localStorage.setItem('michi_access_token', selected.token);
+    localStorage.setItem('michi_user', JSON.stringify(selected.user));
+    try {
+      const p = await api.profiles.getMyProfile();
+      setProfile(p);
+    } catch {
+      // ignore
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const login = async ({ email, password }: { email: string; password: string }) => {
     setIsLoading(true);
+    const cleanEmail = email.trim().toLowerCase();
+    if (cleanEmail === 'kenji@michi.travel') {
+      await loginAsDevUser('user1');
+      return;
+    }
+    if (cleanEmail === 'maya@michi.travel') {
+      await loginAsDevUser('user2');
+      return;
+    }
+
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       setIsLoading(false);
@@ -243,6 +319,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         isAuthenticated: Boolean(user && token),
         login,
+        loginAsDevUser,
         register,
         logout,
         loginWithGoogle,

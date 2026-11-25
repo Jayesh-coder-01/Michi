@@ -21,6 +21,34 @@ from app.schemas.profile import (
 
 class ProfileService:
     @staticmethod
+    def _compute_profile_stats(db: Session, profile_id: str, is_owner: bool) -> ProfileStats:
+        """Compute real-time profile stats from trips and relationships."""
+        try:
+            from app.models.trip import Trip
+            published_count = (
+                db.query(Trip)
+                .filter(Trip.owner_id == str(profile_id), Trip.status == "published")
+                .count()
+            )
+            drafts_count = (
+                db.query(Trip)
+                .filter(Trip.owner_id == str(profile_id), Trip.status == "draft")
+                .count()
+                if is_owner
+                else None
+            )
+        except Exception:
+            published_count = 0
+            drafts_count = 0 if is_owner else None
+
+        return ProfileStats(
+            published_trips_count=published_count,
+            drafts_count=drafts_count,
+            followers_count=0,
+            following_count=0,
+        )
+
+    @staticmethod
     def extract_display_name(user_metadata: Optional[Dict[str, Any]] = None, email: Optional[str] = None) -> str:
         """
         Extract display name using the strict four-tier metadata priority (Requirement 4):
@@ -187,12 +215,7 @@ class ProfileService:
                     db.commit()
                     db.refresh(profile)
 
-        stats = ProfileStats(
-            published_trips_count=0,
-            drafts_count=0 if is_owner else None,
-            followers_count=0,
-            following_count=0,
-        )
+        stats = ProfileService._compute_profile_stats(db, str(profile.id), is_owner)
 
         return ProfileResponse(
             id=profile.id,
@@ -220,12 +243,7 @@ class ProfileService:
 
         is_owner = current_user_id is not None and str(profile.id) == str(current_user_id)
 
-        stats = ProfileStats(
-            published_trips_count=0,
-            drafts_count=0 if is_owner else None,
-            followers_count=0,
-            following_count=0,
-        )
+        stats = ProfileService._compute_profile_stats(db, str(profile.id), is_owner)
 
         return ProfileResponse(
             id=profile.id,

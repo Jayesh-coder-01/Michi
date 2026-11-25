@@ -212,3 +212,61 @@ class PaginatedTripList(BaseModel):
     page: int
     page_size: int
     has_more: bool
+
+
+# ------------------------------------------------------------------------------
+# Route Planning & Waypoint Schemas (Phase 4)
+# ------------------------------------------------------------------------------
+
+class RouteWaypoint(BaseModel):
+    point_type: str = Field(..., description="'origin', 'stop', or 'destination'")
+    stop_id: Optional[str] = None
+    title: str
+    location: str
+    order_index: int
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    has_coordinates: bool = True
+    country: Optional[str] = None
+    country_code: Optional[str] = None
+    state: Optional[str] = None
+    resolved_name: Optional[str] = None
+    arrival_date: Optional[date] = None
+    departure_date: Optional[date] = None
+
+
+class RouteLeg(BaseModel):
+    leg_index: int
+    from_title: str
+    to_title: str
+    from_order_index: int
+    to_order_index: int
+    distance_km: Optional[float] = None
+    estimated_duration_minutes: Optional[int] = None
+    status: str = Field(..., description="'available', 'missing_coordinates', or 'unrouted'")
+
+
+class TripRouteSummary(BaseModel):
+    trip_id: str
+    title: str
+    starting_location: str
+    ending_location: str
+    total_waypoints: int
+    total_stops: int
+    valid_coordinates_count: int
+    missing_coordinates_count: int
+    has_missing_coordinates: bool
+    total_distance_km: float
+    estimated_duration_minutes: Optional[int] = None
+    distance_formatted: str
+    duration_formatted: str
+    calculation_method: str = Field(default="geodesic_haversine", description="'geoapify_roads' or 'geodesic_haversine'")
+    distance_type: str = Field(default="haversine_straight_line", description="'geoapify_road_route' or 'haversine_straight_line'")
+    duration_type: str = Field(default="unverified_estimate", description="'geoapify_verified_duration' or 'unverified_estimate'")
+    is_approximate: bool = True
+    provider: str = Field(default="haversine", description="'geoapify' or 'haversine'")
+    route_geometry: Optional[Dict[str, Any]] = None
+    waypoints: List[RouteWaypoint] = []
+    legs: List[RouteLeg] = []
+    routing_error: Optional[str] = None
+

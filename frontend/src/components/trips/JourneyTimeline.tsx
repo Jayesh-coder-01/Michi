@@ -10,6 +10,8 @@ interface JourneyTimelineProps {
   endDate?: string | null;
   isOwner?: boolean;
   isEditable?: boolean;
+  selectedStopId?: string | null;
+  onSelectStop?: (stopId: string) => void;
   onAddStop?: () => void;
   onEditStop?: (stop: TripStop) => void;
   onDeleteStop?: (stopId: string) => void;
@@ -26,6 +28,8 @@ export const JourneyTimeline: React.FC<JourneyTimelineProps> = ({
   endDate,
   isOwner = false,
   isEditable,
+  selectedStopId,
+  onSelectStop,
   onAddStop,
   onEditStop,
   onDeleteStop,
@@ -119,9 +123,12 @@ export const JourneyTimeline: React.FC<JourneyTimelineProps> = ({
             const dateDisplay =
               arrDate && depDate ? `${arrDate} – ${depDate}` : arrDate || depDate || null;
 
+            const isSelected = selectedStopId === stop.id;
+
             return (
               <div
                 key={stop.id}
+                id={`timeline-stop-${stop.id}`}
                 draggable={showEditControls && !!onReorder}
                 onDragStart={(e) => handleDragStart(e, index)}
                 onDragOver={handleDragOver}
@@ -132,7 +139,9 @@ export const JourneyTimeline: React.FC<JourneyTimelineProps> = ({
               >
                 {/* Node Marker with sequence number */}
                 <div
-                  className={`absolute -left-[35px] md:-left-[43px] top-1 w-7 h-7 md:w-8 md:h-8 rounded-full bg-adventure-orange text-white flex items-center justify-center font-bold text-xs md:text-sm shadow-md ${
+                  className={`absolute -left-[35px] md:-left-[43px] top-1 w-7 h-7 md:w-8 md:h-8 rounded-full ${
+                    isSelected ? 'bg-forest-green ring-4 ring-forest-green/20 scale-110' : 'bg-adventure-orange'
+                  } text-white flex items-center justify-center font-bold text-xs md:text-sm shadow-md transition-all ${
                     showEditControls && onReorder ? 'cursor-grab active:cursor-grabbing' : ''
                   }`}
                   title={showEditControls && onReorder ? 'Drag to reorder' : `Stop #${index + 1}`}
@@ -141,7 +150,15 @@ export const JourneyTimeline: React.FC<JourneyTimelineProps> = ({
                 </div>
 
                 {/* Stop Card */}
-                <div className="p-5 rounded-2xl bg-light-surface dark:bg-dark-surface border border-light-outline-variant dark:border-dark-outline-variant shadow-sm hover:border-adventure-orange/50 transition-colors flex flex-col gap-3">
+                <div
+                  data-testid={`timeline-stop-card-${stop.id}`}
+                  onClick={() => onSelectStop && onSelectStop(stop.id)}
+                  className={`p-5 rounded-2xl border transition-all duration-200 flex flex-col gap-3 cursor-pointer ${
+                    isSelected
+                      ? 'bg-adventure-orange/5 dark:bg-adventure-orange/10 border-adventure-orange shadow-md ring-2 ring-adventure-orange/30'
+                      : 'bg-light-surface dark:bg-dark-surface border-light-outline-variant dark:border-dark-outline-variant shadow-sm hover:border-adventure-orange/50'
+                  }`}
+                >
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -150,9 +167,21 @@ export const JourneyTimeline: React.FC<JourneyTimelineProps> = ({
                             drag_indicator
                           </span>
                         )}
-                        <span className="font-label text-label-xs px-2 py-0.5 rounded-full bg-adventure-orange/15 text-adventure-orange font-semibold">
+                        <span
+                          className={`font-label text-label-xs px-2 py-0.5 rounded-full font-semibold ${
+                            isSelected
+                              ? 'bg-adventure-orange text-white'
+                              : 'bg-adventure-orange/15 text-adventure-orange'
+                          }`}
+                        >
                           Stop #{index + 1}
                         </span>
+                        {isSelected && (
+                          <span className="font-label text-label-xs px-2 py-0.5 rounded-full bg-forest-green text-white font-semibold flex items-center gap-1">
+                            <span className="material-symbols-outlined text-xs">pin_drop</span>
+                            Focused on Map
+                          </span>
+                        )}
                         {dateDisplay && (
                           <span className="font-label text-label-xs text-light-on-surface-variant dark:text-dark-on-surface-variant flex items-center gap-1">
                             <span className="material-symbols-outlined text-xs">calendar_month</span>
@@ -174,9 +203,27 @@ export const JourneyTimeline: React.FC<JourneyTimelineProps> = ({
                       </p>
                     </div>
 
-                    {/* Reorder & Action Controls for Owner */}
-                    {showEditControls && (
-                      <div className="flex items-center gap-1 self-start bg-light-surface-container dark:bg-dark-surface-container p-1 rounded-xl">
+                    {/* Action Controls */}
+                    <div className="flex items-center gap-1 self-start" onClick={(e) => e.stopPropagation()}>
+                      {onSelectStop && (
+                        <button
+                          type="button"
+                          onClick={() => onSelectStop(stop.id)}
+                          className={`px-2.5 py-1 rounded-xl text-xs font-semibold flex items-center gap-1 transition-colors ${
+                            isSelected
+                              ? 'bg-adventure-orange text-white'
+                              : 'bg-light-surface-container dark:bg-dark-surface-container text-light-on-surface-variant dark:text-dark-on-surface-variant hover:text-adventure-orange'
+                          }`}
+                          title="Show marker on map"
+                        >
+                          <span className="material-symbols-outlined text-sm">map</span>
+                          <span className="hidden sm:inline">Map</span>
+                        </button>
+                      )}
+
+                      {/* Reorder & Action Controls for Owner */}
+                      {showEditControls && (
+                        <div className="flex items-center gap-1 bg-light-surface-container dark:bg-dark-surface-container p-1 rounded-xl">
                         {onMoveUp && (
                           <button
                             type="button"
@@ -222,6 +269,7 @@ export const JourneyTimeline: React.FC<JourneyTimelineProps> = ({
                       </div>
                     )}
                   </div>
+                </div>
 
                   {/* Accommodation / Activities / Notes breakdown */}
                   {(stop.accommodation_details || stop.activities || stop.notes) && (

@@ -158,7 +158,7 @@ export const MyProfileScreen: React.FC = () => {
                 <Button
                   variant="adventure"
                   size="md"
-                  onClick={() => alert('Trip creation will activate in Phase 3 (Trip Management).')}
+                  onClick={() => setIsCreateTripModalOpen(true)}
                   leftIcon={<span className="material-symbols-outlined text-lg">add</span>}
                 >
                   New Trip

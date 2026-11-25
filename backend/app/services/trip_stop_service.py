@@ -94,9 +94,13 @@ class TripStopService:
             notes=req.notes,
             order_index=next_idx,
         )
-        db.add(stop)
-        db.commit()
-        db.refresh(stop)
+        try:
+            db.add(stop)
+            db.commit()
+            db.refresh(stop)
+        except Exception:
+            db.rollback()
+            raise
         return TripStopResponse.model_validate(stop)
 
     @classmethod
@@ -112,7 +116,12 @@ class TripStopService:
         Update stop details, coordinates, activities, or notes.
         Verifies trip ownership and rejects foreign stop IDs.
         """
-        trip = db.query(Trip).filter(Trip.id == str(trip_id)).first()
+        trip = (
+            db.query(Trip)
+            .filter(Trip.id == str(trip_id))
+            .with_for_update()
+            .first()
+        )
         if not trip:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -149,12 +158,16 @@ class TripStopService:
                 detail="departure_date cannot be earlier than arrival_date",
             )
 
-        for key, val in update_data.items():
-            if hasattr(stop, key):
-                setattr(stop, key, val)
+        try:
+            for key, val in update_data.items():
+                if hasattr(stop, key):
+                    setattr(stop, key, val)
 
-        db.commit()
-        db.refresh(stop)
+            db.commit()
+            db.refresh(stop)
+        except Exception:
+            db.rollback()
+            raise
         return TripStopResponse.model_validate(stop)
 
     @classmethod
@@ -194,21 +207,25 @@ class TripStopService:
                 detail="Stop does not belong to this trip.",
             )
 
-        deleted_idx = stop.order_index
-        db.delete(stop)
-        db.flush()
+        try:
+            deleted_idx = stop.order_index
+            db.delete(stop)
+            db.flush()
 
-        # Re-index subsequent stops to maintain contiguous 0..N-1 sequence
-        db.query(TripStop).filter(
-            TripStop.trip_id == str(trip_id),
-            TripStop.order_index > deleted_idx,
-        ).update(
-            {TripStop.order_index: TripStop.order_index - 1},
-            synchronize_session="fetch",
-        )
+            # Re-index subsequent stops to maintain contiguous 0..N-1 sequence
+            db.query(TripStop).filter(
+                TripStop.trip_id == str(trip_id),
+                TripStop.order_index > deleted_idx,
+            ).update(
+                {TripStop.order_index: TripStop.order_index - 1},
+                synchronize_session="fetch",
+            )
 
-        db.commit()
-        return {"deleted": True, "id": str(stop_id)}
+            db.commit()
+            return {"deleted": True, "id": str(stop_id)}
+        except Exception:
+            db.rollback()
+            raise
 
     @classmethod
     def reorder_stops(
@@ -306,25 +323,29 @@ class TripStopService:
         # ----------------------------------------------------------------------
         safe_offset = current_max + 1000
 
-        # Phase 1: Shift existing stops to disjoint positive range
-        db.query(TripStop).filter(TripStop.trip_id == str(trip_id)).update(
-            {TripStop.order_index: TripStop.order_index + safe_offset},
-            synchronize_session="fetch",
-        )
-        db.flush()
-
-        # Phase 2: Assign final sequential indices 0..N-1
-        for target_idx, stop_id_str in enumerate(submitted_id_list):
-            db.query(TripStop).filter(
-                TripStop.id == stop_id_str,
-                TripStop.trip_id == str(trip_id),
-            ).update(
-                {TripStop.order_index: target_idx},
+        try:
+            # Phase 1: Shift existing stops to disjoint positive range
+            db.query(TripStop).filter(TripStop.trip_id == str(trip_id)).update(
+                {TripStop.order_index: TripStop.order_index + safe_offset},
                 synchronize_session="fetch",
             )
-        db.flush()
+            db.flush()
 
-        db.commit()
+            # Phase 2: Assign final sequential indices 0..N-1
+            for target_idx, stop_id_str in enumerate(submitted_id_list):
+                db.query(TripStop).filter(
+                    TripStop.id == stop_id_str,
+                    TripStop.trip_id == str(trip_id),
+                ).update(
+                    {TripStop.order_index: target_idx},
+                    synchronize_session="fetch",
+                )
+            db.flush()
+
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
 
         # Fetch and return final ordered stops
         reordered_stops = (

@@ -100,8 +100,8 @@ export const CreateTripScreen: React.FC = () => {
         }
       }
 
-      // Default: navigate to Trip Editor to add stops
-      navigate(`/trips/${createdTrip.id}/edit`);
+      // Default: navigate directly to Trip Details journey view
+      navigate(`/trips/${createdTrip.id}`);
     } catch (err: any) {
       setApiError(err.message || 'Failed to create trip. Please check your inputs.');
     } finally {

@@ -23,6 +23,7 @@ from app.schemas.trip import (
     TripPublishRequest,
     TripResponse,
     PaginatedTripList,
+    TripRouteSummary,
 )
 from app.services.trip_service import TripService
 
@@ -87,6 +88,18 @@ def list_public_trips(
 
 
 @router.get(
+    "/geocode",
+    response_model=APIResponse[Optional[Dict[str, Any]]],
+    summary="Geocode a location name server-side via Geoapify without exposing API keys",
+)
+def geocode_location(
+    q: str = Query(..., min_length=1, max_length=255, description="Location name to geocode"),
+):
+    result = TripService.geocode_location(q)
+    return APIResponse(data=result)
+
+
+@router.get(
     "/{trip_id}",
     response_model=APIResponse[TripResponse],
     summary="Get trip details, stops, and timeline",
@@ -99,6 +112,21 @@ def get_trip_details(
     user_id = optional_user.id if optional_user else None
     trip = TripService.get_trip(db, str(trip_id), current_user_id=user_id)
     return APIResponse(data=trip)
+
+
+@router.get(
+    "/{trip_id}/route",
+    response_model=APIResponse[TripRouteSummary],
+    summary="Get calculated route summary, waypoints, and metrics for a journey",
+)
+def get_trip_route(
+    trip_id: str,
+    optional_user: Optional[AuthenticatedUser] = Depends(get_optional_current_user),
+    db: Session = Depends(get_db_for_optional_user),
+):
+    user_id = optional_user.id if optional_user else None
+    route_summary = TripService.get_trip_route(db, str(trip_id), current_user_id=user_id)
+    return APIResponse(data=route_summary)
 
 
 @router.patch(

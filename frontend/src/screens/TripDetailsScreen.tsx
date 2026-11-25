@@ -6,10 +6,14 @@ import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
 import { StatusBadge, VisibilityBadge, CategoryBadge } from '../components/trips/TripBadge';
 import { JourneyTimeline } from '../components/trips/JourneyTimeline';
+import { InteractiveJourneyMap } from '../components/maps/InteractiveJourneyMap';
+import { RouteMetricsBar } from '../components/maps/RouteMetricsBar';
 import { StopModal } from '../components/trips/StopModal';
 import { TripEditorModal } from '../components/trips/TripEditorModal';
 import { ConfirmModal } from '../components/common/ConfirmModal';
 import { api } from '../services/api';
+import { calculateTripRoute } from '../services/mapsService';
+import { RouteMetrics, MapViewMode } from '../types/maps';
 import {
   Trip,
   TripStop,
@@ -27,6 +31,12 @@ export const TripDetailsScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Maps & Timeline synchronization state
+  const [selectedStopId, setSelectedStopId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<MapViewMode>('split');
+  const [routeMetrics, setRouteMetrics] = useState<RouteMetrics | null>(null);
+  const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
 
   // Modals state
   const [isEditTripOpen, setIsEditTripOpen] = useState(false);
@@ -54,6 +64,36 @@ export const TripDetailsScreen: React.FC = () => {
   useEffect(() => {
     fetchTrip();
   }, [fetchTrip]);
+
+  // Synchronize route metrics whenever trip metadata, stops, or locations change
+  useEffect(() => {
+    if (!trip) return;
+    let isMounted = true;
+    setIsCalculatingRoute(true);
+    calculateTripRoute(trip)
+      .then((metrics) => {
+        if (isMounted) setRouteMetrics(metrics);
+      })
+      .catch((err) => {
+        console.warn('[Michi Maps] Error computing route metrics:', err);
+      })
+      .finally(() => {
+        if (isMounted) setIsCalculatingRoute(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [trip]);
+
+  const handleSelectStop = useCallback((stopId: string | null) => {
+    setSelectedStopId(stopId);
+    if (stopId) {
+      const element = document.getElementById(`timeline-stop-${stopId}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+  }, []);
 
   const isOwner = Boolean(user && trip && user.id === trip.owner_id);
 
@@ -358,26 +398,134 @@ export const TripDetailsScreen: React.FC = () => {
           </section>
         )}
 
-        {/* Journey Timeline */}
-        <section className="p-6 md:p-8 rounded-2xl bg-light-surface dark:bg-dark-surface border border-light-outline-variant dark:border-dark-outline-variant">
-          <JourneyTimeline
-            startingLocation={trip.starting_location}
-            endingLocation={trip.ending_location}
-            stops={trip.stops || []}
-            isOwner={isOwner}
-            onAddStop={() => {
-              setEditingStop(null);
+        {/* Route Metrics Summary Bar */}
+        <RouteMetricsBar
+          metrics={routeMetrics}
+          isLoading={isCalculatingRoute}
+          onEditMissingCoordinates={() => {
+            if (trip.stops && trip.stops.length > 0 && trip.stops.some((s) => Number(s.latitude) === 0 && Number(s.longitude) === 0)) {
+              const unplacedStop = trip.stops.find((s) => Number(s.latitude) === 0 && Number(s.longitude) === 0);
+              setEditingStop(unplacedStop || trip.stops[0]);
               setIsStopModalOpen(true);
-            }}
-            onEditStop={(stop) => {
-              setEditingStop(stop);
-              setIsStopModalOpen(true);
-            }}
-            onDeleteStop={(stopId) => setDeletingStopId(stopId)}
-            onMoveUp={(index) => handleMoveStop(index, 'up')}
-            onMoveDown={(index) => handleMoveStop(index, 'down')}
-          />
-        </section>
+            } else {
+              setIsEditTripOpen(true);
+            }
+          }}
+        />
+
+        {/* Journey Map & Itinerary Section with Responsive View Toggle */}
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="font-headline text-title-lg text-light-on-surface dark:text-dark-on-surface font-bold">
+                Geographical Route & Timeline
+              </h3>
+              <p className="font-body text-body-sm text-light-on-surface-variant dark:text-dark-on-surface-variant">
+                Select any stop to synchronize focus between the interactive map and timeline.
+              </p>
+            </div>
+
+            {/* View Mode Toggle */}
+            <div className="flex items-center self-start sm:self-auto p-1 rounded-2xl bg-light-surface dark:bg-dark-surface border border-light-outline-variant dark:border-dark-outline-variant shadow-sm text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setViewMode('split')}
+                className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 ${
+                  viewMode === 'split'
+                    ? 'bg-forest-green text-on-forest-green shadow-sm'
+                    : 'text-light-on-surface-variant dark:text-dark-on-surface-variant hover:text-light-on-surface'
+                }`}
+                title="Show side-by-side view"
+              >
+                <span className="material-symbols-outlined text-sm">dashboard</span>
+                <span className="hidden md:inline">Split</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('map')}
+                className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 ${
+                  viewMode === 'map'
+                    ? 'bg-forest-green text-on-forest-green shadow-sm'
+                    : 'text-light-on-surface-variant dark:text-dark-on-surface-variant hover:text-light-on-surface'
+                }`}
+                title="Full map view"
+              >
+                <span className="material-symbols-outlined text-sm">map</span>
+                <span>Map</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('timeline')}
+                className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 ${
+                  viewMode === 'timeline'
+                    ? 'bg-forest-green text-on-forest-green shadow-sm'
+                    : 'text-light-on-surface-variant dark:text-dark-on-surface-variant hover:text-light-on-surface'
+                }`}
+                title="Full timeline view"
+              >
+                <span className="material-symbols-outlined text-sm">timeline</span>
+                <span>Timeline</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Interactive Responsive Grid: Side-by-Side on Desktop, Responsive on Mobile */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* Timeline Column */}
+            <section
+              className={`${
+                viewMode === 'map'
+                  ? 'hidden'
+                  : viewMode === 'timeline'
+                  ? 'col-span-12'
+                  : 'col-span-12 lg:col-span-5'
+              } p-6 md:p-8 rounded-3xl bg-light-surface dark:bg-dark-surface border border-light-outline-variant dark:border-dark-outline-variant shadow-sm`}
+            >
+              <JourneyTimeline
+                startingLocation={trip.starting_location}
+                endingLocation={trip.ending_location}
+                stops={trip.stops || []}
+                isOwner={isOwner}
+                selectedStopId={selectedStopId}
+                onSelectStop={handleSelectStop}
+                onAddStop={() => {
+                  setEditingStop(null);
+                  setIsStopModalOpen(true);
+                }}
+                onEditStop={(stop) => {
+                  setEditingStop(stop);
+                  setIsStopModalOpen(true);
+                }}
+                onDeleteStop={(stopId) => setDeletingStopId(stopId)}
+                onMoveUp={(index) => handleMoveStop(index, 'up')}
+                onMoveDown={(index) => handleMoveStop(index, 'down')}
+              />
+            </section>
+
+            {/* Interactive Map Column */}
+            <section
+              className={`${
+                viewMode === 'timeline'
+                  ? 'hidden'
+                  : viewMode === 'map'
+                  ? 'col-span-12'
+                  : 'col-span-12 lg:col-span-7'
+              } lg:sticky lg:top-24 flex flex-col gap-4`}
+            >
+              <InteractiveJourneyMap
+                trip={trip}
+                selectedStopId={selectedStopId}
+                onSelectStop={handleSelectStop}
+                onEditStop={(stop) => {
+                  setEditingStop(stop);
+                  setIsStopModalOpen(true);
+                }}
+                onEditTrip={() => setIsEditTripOpen(true)}
+                height={viewMode === 'map' ? '650px' : '560px'}
+              />
+            </section>
+          </div>
+        </div>
       </div>
 
       {/* Modals */}

@@ -434,3 +434,103 @@ def test_batch_reorder_overflow_guard(client, auth_headers, sample_trip, db_sess
     )
     assert res.status_code == 422
     assert "safe" in str(res.json()).lower() or "threshold" in str(res.json()).lower()
+
+
+# ==============================================================================
+# 5. Anonymous & Visitor Access Control for Stops
+# ==============================================================================
+
+def test_list_stops_anonymous_private_trip_forbidden(client, auth_headers, sample_trip):
+    """Anonymous visitors cannot list stops of a private/draft journey (HTTP 403)."""
+    trip_id = sample_trip["id"]
+    client.post(
+        f"/api/v1/trips/{trip_id}/stops",
+        json={"stop_name": "Hidden Stop", "location": "Secret", "latitude": 33.0, "longitude": 135.0},
+        headers=auth_headers,
+    )
+
+    # Anonymous call without Authorization header
+    anon_res = client.get(f"/api/v1/trips/{trip_id}/stops")
+    assert anon_res.status_code == 403
+    assert "private" in str(anon_res.json()).lower() or "forbidden" in str(anon_res.json()).lower()
+
+
+def test_list_stops_anonymous_public_published_trip_allowed(client, auth_headers, sample_trip):
+    """Anonymous visitors can list stops of a published, public journey (HTTP 200)."""
+    trip_id = sample_trip["id"]
+
+    # Add stop
+    client.post(
+        f"/api/v1/trips/{trip_id}/stops",
+        json={"stop_name": "Public Sanctuary", "location": "Nara", "latitude": 34.6851, "longitude": 135.8048},
+        headers=auth_headers,
+    )
+
+    # Publish trip as public
+    pub_res = client.post(
+        f"/api/v1/trips/{trip_id}/publish",
+        json={"visibility": "public"},
+        headers=auth_headers,
+    )
+    assert pub_res.status_code == 200
+
+    # Anonymous call
+    anon_res = client.get(f"/api/v1/trips/{trip_id}/stops")
+    assert anon_res.status_code == 200
+    stops = anon_res.json()["data"]
+    assert len(stops) == 1
+    assert stops[0]["stop_name"] == "Public Sanctuary"
+
+
+def test_batch_reorder_transactional_rollback_on_failure(client, auth_headers, sample_trip, db_session):
+    """
+    If a database error occurs during reorder execution, the entire transaction
+    is rolled back: stops retain their original indices and do NOT stay in shifted range.
+    """
+    from app.services.trip_stop_service import TripStopService
+
+    trip_id = sample_trip["id"]
+    s1 = client.post(
+        f"/api/v1/trips/{trip_id}/stops",
+        json={"stop_name": "Stop 1", "location": "Loc 1", "latitude": 33.0, "longitude": 135.0},
+        headers=auth_headers,
+    ).json()["data"]
+    s2 = client.post(
+        f"/api/v1/trips/{trip_id}/stops",
+        json={"stop_name": "Stop 2", "location": "Loc 2", "latitude": 34.0, "longitude": 136.0},
+        headers=auth_headers,
+    ).json()["data"]
+
+    call_count = 0
+    original_query = db_session.query
+
+    def mock_query(model):
+        q = original_query(model)
+        original_update = q.update
+        def tracked_update(*u_args, **u_kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count > 1:  # Fail on Phase 2 first stop update
+                raise RuntimeError("Simulated mid-reorder failure")
+            return original_update(*u_args, **u_kwargs)
+        q.update = tracked_update
+        return q
+
+    db_session.query = mock_query
+
+    # Reorder request that will trigger the failure
+    with pytest.raises(RuntimeError, match="Simulated mid-reorder failure"):
+        TripStopService.reorder_stops(db_session, trip_id, sample_trip["owner_id"], [s2["id"], s1["id"]])
+
+    # Restore query method
+    db_session.query = original_query
+
+    # Verify state after rollback: order_index is preserved at 0 and 1 (NOT shifted into offset range)
+    list_res = client.get(f"/api/v1/trips/{trip_id}/stops", headers=auth_headers)
+    assert list_res.status_code == 200
+    current_stops = list_res.json()["data"]
+    assert current_stops[0]["order_index"] == 0
+    assert current_stops[1]["order_index"] == 1
+    assert current_stops[0]["id"] == s1["id"]
+    assert current_stops[1]["id"] == s2["id"]
+

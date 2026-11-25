@@ -162,4 +162,15 @@ export const tripService = {
       method: 'PUT',
       body: JSON.stringify({ ordered_stop_ids: orderedStopIds }),
     }),
+
+  getTripRoute: (tripId: string): Promise<any> =>
+    request<any>(`/trips/${encodeURIComponent(tripId)}/route`, { method: 'GET' }),
+
+  geocodeLocation: (
+    query: string
+  ): Promise<{ lat: number; lng: number; formatted?: string } | null> =>
+    request<{ lat: number; lng: number; formatted?: string } | null>(
+      `/trips/geocode?q=${encodeURIComponent(query)}`,
+      { method: 'GET' }
+    ),
 };

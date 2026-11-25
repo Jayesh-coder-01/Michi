@@ -151,3 +151,47 @@ export interface TripStopUpdateInput {
 export interface TripStopReorderInput {
   ordered_stop_ids: string[];
 }
+
+export interface RouteWaypointResponse {
+  point_type: 'origin' | 'stop' | 'destination';
+  stop_id?: string | null;
+  title: string;
+  location: string;
+  order_index: number;
+  latitude?: number | null;
+  longitude?: number | null;
+  has_coordinates: boolean;
+  arrival_date?: string | null;
+  departure_date?: string | null;
+}
+
+export interface RouteLegResponse {
+  leg_index: number;
+  from_title: string;
+  to_title: string;
+  from_order_index: number;
+  to_order_index: number;
+  distance_km?: number | null;
+  estimated_duration_minutes?: number | null;
+  status: 'available' | 'missing_coordinates' | 'unrouted';
+}
+
+export interface TripRouteSummary {
+  trip_id: string;
+  title: string;
+  starting_location: string;
+  ending_location: string;
+  total_waypoints: number;
+  total_stops: number;
+  valid_coordinates_count: number;
+  missing_coordinates_count: number;
+  has_missing_coordinates: boolean;
+  total_distance_km: number;
+  estimated_duration_minutes: number;
+  distance_formatted: string;
+  duration_formatted: string;
+  calculation_method: string;
+  waypoints: RouteWaypointResponse[];
+  legs: RouteLegResponse[];
+}
+

@@ -6,6 +6,8 @@ import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
 import { StatusBadge, VisibilityBadge } from '../components/trips/TripBadge';
 import { JourneyTimeline } from '../components/trips/JourneyTimeline';
+import { InteractiveJourneyMap } from '../components/maps/InteractiveJourneyMap';
+import { RouteMetricsBar } from '../components/maps/RouteMetricsBar';
 import { StopModal } from '../components/trips/StopModal';
 import { PublishModal } from '../components/trips/PublishModal';
 import { ConfirmModal } from '../components/common/ConfirmModal';
@@ -36,7 +38,8 @@ export const TripEditorScreen: React.FC = () => {
 
   const [trip, setTrip] = useState<Trip | null>(null);
   const [stops, setStops] = useState<TripStop[]>([]);
-  const [activeTab, setActiveTab] = useState<'details' | 'stops' | 'lifecycle'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'stops' | 'map' | 'lifecycle'>('details');
+  const [selectedMapStopId, setSelectedMapStopId] = useState<string | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingMetadata, setIsSavingMetadata] = useState(false);
@@ -390,6 +393,19 @@ export const TripEditorScreen: React.FC = () => {
 
           <button
             type="button"
+            onClick={() => setActiveTab('map')}
+            className={`px-5 py-2.5 font-label text-sm font-semibold rounded-t-xl transition-colors border-b-2 flex items-center gap-1.5 ${
+              activeTab === 'map'
+                ? 'border-forest-green text-forest-green dark:border-dark-primary dark:text-dark-primary bg-forest-green/5'
+                : 'border-transparent text-light-on-surface-variant dark:text-dark-on-surface-variant hover:text-light-on-surface'
+            }`}
+          >
+            <span className="material-symbols-outlined text-base">map</span>
+            3. Route Map
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('lifecycle')}
             className={`px-5 py-2.5 font-label text-sm font-semibold rounded-t-xl transition-colors border-b-2 flex items-center gap-1.5 ${
               activeTab === 'lifecycle'
@@ -398,7 +414,7 @@ export const TripEditorScreen: React.FC = () => {
             }`}
           >
             <span className="material-symbols-outlined text-base">settings</span>
-            3. Lifecycle & Privacy
+            4. Lifecycle & Privacy
           </button>
         </div>
 
@@ -587,7 +603,50 @@ export const TripEditorScreen: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 3: LIFECYCLE & DANGEROUS ACTIONS */}
+        {/* TAB 3: ROUTE MAP & GEOGRAPHY */}
+        {activeTab === 'map' && (
+          <div className="flex flex-col gap-6">
+            <div className="bg-light-surface dark:bg-dark-surface border border-light-outline-variant dark:border-dark-outline-variant rounded-2xl p-6 md:p-8 flex flex-col gap-6 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-light-outline-variant dark:border-dark-outline-variant pb-4">
+                <div>
+                  <h2 className="font-headline text-title-md font-bold text-light-on-surface dark:text-dark-on-surface">
+                    Journey Map & Route Visualization
+                  </h2>
+                  <p className="font-body text-body-sm text-light-on-surface-variant dark:text-dark-on-surface-variant">
+                    Interactive geographical preview of your starting point, intermediate stops, and final destination.
+                  </p>
+                </div>
+                <Button
+                  variant="adventure"
+                  size="sm"
+                  onClick={() => {
+                    setEditingStop(null);
+                    setIsStopModalOpen(true);
+                  }}
+                >
+                  <span className="material-symbols-outlined text-base mr-1">add_location_alt</span>
+                  Add Waypoint
+                </Button>
+              </div>
+
+              <InteractiveJourneyMap
+                trip={{ ...trip, stops }}
+                selectedStopId={selectedMapStopId}
+                onSelectStop={(stopId) => setSelectedMapStopId(stopId)}
+                onEditStop={(stop) => {
+                  setEditingStop(stop);
+                  setIsStopModalOpen(true);
+                }}
+                onEditTrip={() => {
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                height="550px"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: LIFECYCLE & DANGEROUS ACTIONS */}
         {activeTab === 'lifecycle' && (
           <div className="flex flex-col gap-6">
             {/* Status Machine Controls */}

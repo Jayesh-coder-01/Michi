@@ -16,8 +16,11 @@ from sqlalchemy import create_engine, text
 MIGRATIONS_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "supabase", "migrations")
 )
+ROLLBACKS_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "supabase", "rollbacks")
+)
 UP_MIGRATION_PATH = os.path.join(MIGRATIONS_DIR, "20261125000000_phase3_trips_stops.sql")
-DOWN_MIGRATION_PATH = os.path.join(MIGRATIONS_DIR, "20261125000000_phase3_trips_stops_down.sql")
+DOWN_MIGRATION_PATH = os.path.join(ROLLBACKS_DIR, "20261125000000_phase3_trips_stops_down.sql")
 
 
 def read_sql_file(path: str) -> str:
@@ -41,7 +44,7 @@ def down_sql() -> str:
 # ==============================================================================
 
 def test_migration_files_exist():
-    """Verify both UP and DOWN migration files exist in supabase/migrations."""
+    """Verify UP migration exists in supabase/migrations and DOWN migration in supabase/rollbacks."""
     assert os.path.exists(UP_MIGRATION_PATH), f"Missing up migration: {UP_MIGRATION_PATH}"
     assert os.path.exists(DOWN_MIGRATION_PATH), f"Missing down migration: {DOWN_MIGRATION_PATH}"
 

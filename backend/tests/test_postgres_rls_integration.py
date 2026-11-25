@@ -35,19 +35,25 @@ def pg_engine():
     """Create a connection engine to the dedicated PostgreSQL test database."""
     if not POSTGRES_TEST_URL:
         pytest.skip("POSTGRES_TEST_DATABASE_URL not set")
-    engine = create_engine(POSTGRES_TEST_URL, pool_pre_ping=True)
+    db_url = POSTGRES_TEST_URL
+    if db_url.startswith("postgresql://"):
+        db_url = db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+    engine = create_engine(db_url, pool_pre_ping=True)
     
     # Initialize schema stubs for Supabase auth schema and roles if needed
     with engine.begin() as conn:
-        conn.execute(text("CREATE SCHEMA IF NOT EXISTS auth;"))
-        conn.execute(text("""
-            CREATE TABLE IF NOT EXISTS auth.users (
-                id UUID PRIMARY KEY,
-                email TEXT,
-                raw_user_meta_data JSONB DEFAULT '{}'::jsonb,
-                created_at TIMESTAMPTZ DEFAULT NOW()
-            );
-        """))
+        auth_users_exist = conn.execute(text("SELECT to_regclass('auth.users');")).scalar()
+        if not auth_users_exist:
+            conn.execute(text("CREATE SCHEMA IF NOT EXISTS auth;"))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS auth.users (
+                    id UUID PRIMARY KEY,
+                    email TEXT,
+                    raw_user_meta_data JSONB DEFAULT '{}'::jsonb,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                );
+            """))
+
         # Create 'authenticated' and 'anon' roles if they do not exist
         conn.execute(text("""
             DO $$
@@ -60,31 +66,38 @@ def pg_engine():
                 END IF;
             END $$;
         """))
-        # Create auth.uid() function mimicking Supabase
-        conn.execute(text("""
-            CREATE OR REPLACE FUNCTION auth.uid()
-            RETURNS uuid AS $$
-            SELECT COALESCE(
-                NULLIF(current_setting('request.jwt.claim.sub', true), ''),
-                ((NULLIF(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub'))
-            )::uuid;
-            $$ LANGUAGE sql STABLE;
-        """))
-        # Read and apply Phase 2 profile migration
-        phase2_path = os.path.join(
-            os.path.dirname(__file__), "..", "..", "supabase", "migrations", "20261124000000_phase2_auth_profiles.sql"
-        )
-        if os.path.exists(phase2_path):
-            with open(phase2_path, "r", encoding="utf-8") as f:
-                conn.execute(text(f.read()))
 
-        # Read and apply Phase 3 trips & stops migration
-        phase3_path = os.path.join(
-            os.path.dirname(__file__), "..", "..", "supabase", "migrations", "20261125000000_phase3_trips_stops.sql"
-        )
-        if os.path.exists(phase3_path):
-            with open(phase3_path, "r", encoding="utf-8") as f:
-                conn.execute(text(f.read()))
+        # Create auth.uid() function mimicking Supabase if not already present
+        auth_uid_exist = conn.execute(text("SELECT to_regprocedure('auth.uid()');")).scalar()
+        if not auth_uid_exist:
+            conn.execute(text("""
+                CREATE OR REPLACE FUNCTION auth.uid()
+                RETURNS uuid AS $$
+                SELECT COALESCE(
+                    NULLIF(current_setting('request.jwt.claim.sub', true), ''),
+                    ((NULLIF(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub'))
+                )::uuid;
+                $$ LANGUAGE sql STABLE;
+            """))
+
+        # Check if public.trips already exists (e.g. Supabase local instance already migrated)
+        trips_exist = conn.execute(text("SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'trips';")).scalar()
+        if not trips_exist:
+            # Read and apply Phase 2 profile migration
+            phase2_path = os.path.join(
+                os.path.dirname(__file__), "..", "..", "supabase", "migrations", "20261124000000_phase2_auth_profiles.sql"
+            )
+            if os.path.exists(phase2_path):
+                with open(phase2_path, "r", encoding="utf-8") as f:
+                    conn.execute(text(f.read()))
+
+            # Read and apply Phase 3 trips & stops migration
+            phase3_path = os.path.join(
+                os.path.dirname(__file__), "..", "..", "supabase", "migrations", "20261125000000_phase3_trips_stops.sql"
+            )
+            if os.path.exists(phase3_path):
+                with open(phase3_path, "r", encoding="utf-8") as f:
+                    conn.execute(text(f.read()))
 
     yield engine
     engine.dispose()
@@ -241,16 +254,19 @@ def test_postgres_admin_connection_isolation(pg_engine):
 def test_postgres_phase3_trips_and_stops_rls(pg_engine):
     """Verify Phase 3 RLS policies on public.trips and public.trip_stops."""
     with pg_engine.connect() as conn:
-        # Step 0: Ensure users exist in auth and profiles
+        trip_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+        stop_id = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+
+        # Step 0: Ensure users exist in auth and profiles, and clean up any prior test rows
         with conn.begin():
+            conn.execute(text("DELETE FROM public.trip_stops WHERE trip_id = :trip_id;"), {"trip_id": trip_id})
+            conn.execute(text("DELETE FROM public.trips WHERE id = :trip_id;"), {"trip_id": trip_id})
             conn.execute(text("INSERT INTO auth.users (id, email) VALUES (:id, 'a@michi.travel') ON CONFLICT (id) DO NOTHING;"), {"id": USER_A_UUID})
             conn.execute(text("INSERT INTO auth.users (id, email) VALUES (:id, 'b@michi.travel') ON CONFLICT (id) DO NOTHING;"), {"id": USER_B_UUID})
             conn.execute(text("INSERT INTO public.profiles (id, username, display_name) VALUES (:id, 'alice_pg3', 'Alice PG3') ON CONFLICT (id) DO NOTHING;"), {"id": USER_A_UUID})
             conn.execute(text("INSERT INTO public.profiles (id, username, display_name) VALUES (:id, 'bob_pg3', 'Bob PG3') ON CONFLICT (id) DO NOTHING;"), {"id": USER_B_UUID})
 
         # Step 1: User A creates a private draft trip and adds a stop
-        trip_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-        stop_id = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
         with conn.begin():
             conn.execute(text("SELECT set_config('request.jwt.claim.sub', :sub, true);"), {"sub": USER_A_UUID})
             conn.execute(text("SET LOCAL ROLE authenticated;"))
@@ -308,9 +324,11 @@ def test_postgres_phase3_stop_trip_id_immutability(pg_engine):
 
     with pg_engine.connect() as conn:
         with conn.begin():
-            conn.execute(text("INSERT INTO public.trips (id, owner_id, title, starting_location, ending_location) VALUES (:id, :owner_id, 'Trip 1', 'Loc A', 'Loc B') ON CONFLICT DO NOTHING;"), {"id": trip_1, "owner_id": USER_A_UUID})
-            conn.execute(text("INSERT INTO public.trips (id, owner_id, title, starting_location, ending_location) VALUES (:id, :owner_id, 'Trip 2', 'Loc C', 'Loc D') ON CONFLICT DO NOTHING;"), {"id": trip_2, "owner_id": USER_A_UUID})
-            conn.execute(text("INSERT INTO public.trip_stops (id, trip_id, stop_name, location, latitude, longitude, order_index) VALUES (:id, :trip_id, 'Stop 1', 'Loc S', 0, 0, 0) ON CONFLICT DO NOTHING;"), {"id": stop_id, "trip_id": trip_1})
+            conn.execute(text("DELETE FROM public.trip_stops WHERE id = :id;"), {"id": stop_id})
+            conn.execute(text("DELETE FROM public.trips WHERE id IN (:t1, :t2);"), {"t1": trip_1, "t2": trip_2})
+            conn.execute(text("INSERT INTO public.trips (id, owner_id, title, starting_location, ending_location) VALUES (:id, :owner_id, 'Trip 1', 'Loc A', 'Loc B') ON CONFLICT (id) DO NOTHING;"), {"id": trip_1, "owner_id": USER_A_UUID})
+            conn.execute(text("INSERT INTO public.trips (id, owner_id, title, starting_location, ending_location) VALUES (:id, :owner_id, 'Trip 2', 'Loc C', 'Loc D') ON CONFLICT (id) DO NOTHING;"), {"id": trip_2, "owner_id": USER_A_UUID})
+            conn.execute(text("INSERT INTO public.trip_stops (id, trip_id, stop_name, location, latitude, longitude, order_index) VALUES (:id, :trip_id, 'Stop 1', 'Loc S', 0, 0, 0) ON CONFLICT (id) DO NOTHING;"), {"id": stop_id, "trip_id": trip_1})
 
         with pytest.raises(DBAPIError) as exc_info:
             with conn.begin():

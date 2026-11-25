@@ -7,7 +7,7 @@ import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
 
 export const LoginScreen: React.FC = () => {
-  const { login, loginWithGoogle } = useAuth();
+  const { login, loginWithGoogle, loginAsDevUser } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const redirect = searchParams.get('redirect') || '/profile';
@@ -17,6 +17,19 @@ export const LoginScreen: React.FC = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleDevSignIn = async (userKey: 'user1' | 'user2') => {
+    setError(null);
+    setIsLoading(true);
+    try {
+      await loginAsDevUser(userKey);
+      navigate(redirect);
+    } catch (err: any) {
+      setError(err.message || 'Dev login failed.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -150,6 +163,37 @@ export const LoginScreen: React.FC = () => {
           </svg>
           Google Account
         </Button>
+
+        {/* Demo Test Accounts for QA & Local Development */}
+        <div className="flex flex-col gap-2 p-3.5 rounded-2xl border border-dashed border-light-outline-variant dark:border-dark-outline-variant bg-light-surface-container/60 dark:bg-dark-surface-container/60 mt-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-forest-green dark:text-dark-primary flex items-center gap-1">
+              <span className="material-symbols-outlined text-sm">badge</span>
+              Demo Accounts (QA)
+            </span>
+            <span className="text-[10px] text-light-on-surface-variant dark:text-dark-on-surface-variant font-mono">
+              local test bypass
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 mt-1">
+            <button
+              type="button"
+              data-testid="dev-login-user1"
+              onClick={() => handleDevSignIn('user1')}
+              className="px-3 py-2 text-xs font-semibold rounded-xl bg-forest-green/10 text-forest-green dark:text-dark-primary hover:bg-forest-green/20 border border-forest-green/30 text-center transition-colors"
+            >
+              Sign In: Kenji (Owner)
+            </button>
+            <button
+              type="button"
+              data-testid="dev-login-user2"
+              onClick={() => handleDevSignIn('user2')}
+              className="px-3 py-2 text-xs font-semibold rounded-xl bg-sky-blue/10 text-sky-blue hover:bg-sky-blue/20 border border-sky-blue/30 text-center transition-colors"
+            >
+              Sign In: Maya (Visitor)
+            </button>
+          </div>
+        </div>
 
         <p className="text-center font-body text-body-md text-light-on-surface-variant dark:text-dark-on-surface-variant mt-2">
           New to MICHI?{' '}

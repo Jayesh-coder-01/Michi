@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     # Database URL (Postgres in production / SQLite for local/test)
     DATABASE_URL: str = "sqlite:///./michi_dev.db"
 
+    # Geoapify API Configuration (Phase 4 Maps & Routing)
+    GEOAPIFY_API_KEY: Optional[str] = None
+
     # CORS Allowed Origins
     CORS_ORIGINS: Union[str, List[str]] = [
         "http://localhost:3000",

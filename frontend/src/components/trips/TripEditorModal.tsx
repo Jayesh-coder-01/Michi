@@ -226,7 +226,7 @@ export const TripEditorModal: React.FC<TripEditorModalProps> = ({
           />
         </div>
 
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-light-outline-variant dark:border-dark-outline-variant">
+        <div className="sticky bottom-0 bg-light-surface dark:bg-dark-surface flex items-center justify-end gap-3 pt-4 pb-1 border-t border-light-outline-variant dark:border-dark-outline-variant">
           <Button variant="ghost" type="button" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>

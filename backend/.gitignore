@@ -3,7 +3,31 @@
 .env*
 .env*.local
 .env.local
+.env.development
 .env.development.local
+.env.test
 .env.test.local
+.env.production
 .env.production.local
+.env.staging
+.env.staging.local
+*.env
+*.env.*
 !.env.example
+
+# Databases & Backups
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+*.dump
+*.bak
+
+# Certificates & Keys
+*.pem
+*.key
+*.crt
+*credentials*.json
+*service-account*.json
+*service_role*.json
+client_secret*.json
