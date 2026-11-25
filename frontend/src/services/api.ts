@@ -12,9 +12,15 @@ import {
   PaginatedTripList,
 } from '../types/trip';
 
-const API_BASE = typeof window !== 'undefined' && window.location?.origin && window.location.origin !== 'null'
-  ? `${window.location.origin}/api/v1`
-  : 'http://localhost:3000/api/v1';
+const configuredApiBase = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/+$/, '');
+const fallbackOrigin =
+  typeof window !== 'undefined' && window.location?.origin && window.location.origin !== 'null'
+    ? window.location.origin
+    : 'http://localhost:3000';
+const API_BASE =
+  configuredApiBase && /^https?:\/\//i.test(configuredApiBase)
+    ? configuredApiBase
+    : `${fallbackOrigin}${configuredApiBase || '/api/v1'}`;
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem('michi_access_token');
