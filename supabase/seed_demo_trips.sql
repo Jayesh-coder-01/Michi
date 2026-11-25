@@ -161,8 +161,8 @@ VALUES
         '2026-07-10',
         '2026-07-20',
         'Trekking',
-        'public'::public.trip_visibility,
-        'published'::public.trip_status,
+        'public',
+        'published',
         '2026-11-25T18:05:00Z'::timestamptz,
         NOW()
     ),
@@ -177,8 +177,8 @@ VALUES
         '2026-09-04',
         '2026-09-12',
         'Road trip',
-        'public'::public.trip_visibility,
-        'published'::public.trip_status,
+        'public',
+        'published',
         '2026-11-25T18:04:00Z'::timestamptz,
         NOW()
     ),
@@ -193,8 +193,8 @@ VALUES
         '2026-10-15',
         '2026-10-22',
         'Cultural exploration',
-        'public'::public.trip_visibility,
-        'published'::public.trip_status,
+        'public',
+        'published',
         '2026-11-25T18:03:00Z'::timestamptz,
         NOW()
     ),
@@ -209,8 +209,8 @@ VALUES
         '2026-08-02',
         '2026-08-11',
         'Backpacking',
-        'public'::public.trip_visibility,
-        'published'::public.trip_status,
+        'public',
+        'published',
         '2026-11-25T18:02:00Z'::timestamptz,
         NOW()
     ),
@@ -225,8 +225,8 @@ VALUES
         '2026-06-12',
         '2026-06-18',
         'Beach vacation',
-        'public'::public.trip_visibility,
-        'published'::public.trip_status,
+        'public',
+        'published',
         '2026-11-25T18:01:00Z'::timestamptz,
         NOW()
     )
