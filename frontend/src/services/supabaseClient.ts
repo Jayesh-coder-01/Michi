@@ -23,6 +23,10 @@ class MockSupabaseAuth {
     return { data: { session: this.currentSession }, error: null };
   }
 
+  async refreshSession() {
+    return { data: { session: this.currentSession, user: this.currentSession?.user ?? null }, error: null };
+  }
+
   onAuthStateChange(callback: (event: string, session: any) => void) {
     this.listeners.push(callback);
     return {

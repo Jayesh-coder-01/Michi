@@ -1,57 +1,5 @@
-import { APIResponse } from '../types/api';
 import { Profile, ProfileUpdateInput, UsernameCheckResult } from '../types/profile';
-import { tripService } from './tripService';
-import {
-  Trip,
-  TripStop,
-  TripCreateInput,
-  TripUpdateInput,
-  TripPublishInput,
-  TripStopCreateInput,
-  TripStopUpdateInput,
-  PaginatedTripList,
-} from '../types/trip';
-
-const configuredApiBase = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/+$/, '');
-const fallbackOrigin =
-  typeof window !== 'undefined' && window.location?.origin && window.location.origin !== 'null'
-    ? window.location.origin
-    : 'http://localhost:3000';
-const API_BASE =
-  configuredApiBase && /^https?:\/\//i.test(configuredApiBase)
-    ? configuredApiBase
-    : `${fallbackOrigin}${configuredApiBase || '/api/v1'}`;
-
-async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = localStorage.getItem('michi_access_token');
-  const headers = new Headers(options.headers || {});
-
-  headers.set('Content-Type', 'application/json');
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`);
-  }
-
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    ...options,
-    headers,
-  });
-
-  const json: APIResponse<T> = await response.json().catch(() => ({
-    success: false,
-    data: null,
-    error: { code: 'NETWORK_ERROR', message: 'Failed to parse response from server' },
-  }));
-
-  if (!response.ok || !json.success) {
-    const errorMsg = json.error?.message || `Request failed with status ${response.status}`;
-    const err = new Error(errorMsg);
-    (err as any).code = json.error?.code || `HTTP_${response.status}`;
-    (err as any).details = json.error?.details;
-    throw err;
-  }
-
-  return json.data as T;
-}
+import { request, tripService } from './tripService';
 
 export const api = {
   auth: {

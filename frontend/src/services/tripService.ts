@@ -9,6 +9,7 @@ import {
   TripStopUpdateInput,
 } from '../types/trip';
 import { APIResponse } from '../types/api';
+import { supabase } from './supabaseClient';
 
 const configuredApiBase = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/+$/, '');
 const fallbackOrigin =
@@ -20,19 +21,53 @@ const API_BASE =
     ? configuredApiBase
     : `${fallbackOrigin}${configuredApiBase || '/api/v1'}`;
 
-export async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = localStorage.getItem('michi_access_token');
-  const headers = new Headers(options.headers || {});
+async function getAccessToken(): Promise<string | null> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const sessionToken = data?.session?.access_token;
+    if (sessionToken) {
+      localStorage.setItem('michi_access_token', sessionToken);
+      return sessionToken;
+    }
+  } catch {
+    // Fall back to localStorage if Supabase session lookup fails
+  }
+  return localStorage.getItem('michi_access_token');
+}
 
+async function performFetch(endpoint: string, options: RequestInit, token: string | null): Promise<Response> {
+  const headers = new Headers(options.headers || {});
   headers.set('Content-Type', 'application/json');
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
   }
-
-  const response = await fetch(`${API_BASE}${endpoint}`, {
+  return fetch(`${API_BASE}${endpoint}`, {
     ...options,
     headers,
   });
+}
+
+export async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const token = await getAccessToken();
+  let response = await performFetch(endpoint, options, token);
+
+  // On 401 (e.g., expired JWT), try refreshing the Supabase session once before failing
+  if (response.status === 401 && token) {
+    try {
+      const { data } = await supabase.auth.refreshSession();
+      const refreshedToken = data?.session?.access_token;
+      if (refreshedToken && refreshedToken !== token) {
+        localStorage.setItem('michi_access_token', refreshedToken);
+        response = await performFetch(endpoint, options, refreshedToken);
+      } else {
+        localStorage.removeItem('michi_access_token');
+        localStorage.removeItem('michi_user');
+      }
+    } catch {
+      localStorage.removeItem('michi_access_token');
+      localStorage.removeItem('michi_user');
+    }
+  }
 
   const json: APIResponse<T> = await response.json().catch(() => ({
     success: false,
